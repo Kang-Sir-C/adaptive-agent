@@ -33,7 +33,16 @@ export class BrokerProvider implements ModelProvider {
   }
 
   pickCompareModels(taskType: TaskType): [ModelProfile, ModelProfile] {
-    const ranked = [...modelProfiles].sort((a, b) => b.strengths[taskType] - a.strengths[taskType]);
-    return [ranked[0], ranked[1] ?? ranked[0]];
+    // Comparing two near-identical premium models rarely produces useful
+    // signal. Pick the strongest model, and pair it with the strongest model
+    // from a *different* tier (preferring cheap/mid) so the compare workflow
+    // actually exposes a quality-vs-cost tradeoff worth recording.
+    const byStrength = [...modelProfiles].sort((a, b) => b.strengths[taskType] - a.strengths[taskType]);
+    const primary = byStrength[0];
+    if (!primary) {
+      throw new Error("No model profiles configured. Edit src/config/models.ts.");
+    }
+    const secondary = byStrength.find((profile) => profile.tier !== primary.tier) ?? byStrength[1] ?? primary;
+    return [primary, secondary];
   }
 }

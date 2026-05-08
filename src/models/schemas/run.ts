@@ -31,6 +31,19 @@ export type RunRequest = {
     allowParallel?: boolean;
     maxLatencyMs?: number;
   };
+  /**
+   * Optional caller overrides. Clients that know what they want can bypass
+   * AA's triage/workflow selection:
+   * - `forceModel`: call this exact model id, skip triage and workflow layers.
+   *   Useful when a client wants pass-through behavior for a specific model.
+   * - `forceWorkflow`: keep triage (for tier and task type), but override
+   *   which workflow template executes.
+   * Both fields are optional. When absent, AA runs its normal triage loop.
+   */
+  routing?: {
+    forceModel?: string;
+    forceWorkflow?: WorkflowName;
+  };
 };
 
 export type RunArtifactBundle = {

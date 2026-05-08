@@ -15,9 +15,19 @@ export class CheapFirstWorkflow implements Workflow {
 
   async execute(context: RunContext): Promise<WorkflowResult> {
     const assessment = context.assessment!;
-    const cheapProfile = this.provider.pickModelByTier("cheap", assessment.taskType);
+
+    // Start from one tier below the suggested tier. If suggested tier is
+    // already cheap, start at cheap (can't go lower). This way triage's
+    // tier recommendation actually influences the starting point.
+    const startTier = assessment.modelTier === "premium" ? "mid"
+      : assessment.modelTier === "mid" ? "cheap"
+      : "cheap";
+    const escalateTier = assessment.modelTier === "premium" ? "premium"
+      : "mid";
+
+    const firstProfile = this.provider.pickModelByTier(startTier, assessment.taskType);
     const firstResponse = await this.provider.generate({
-      model: cheapProfile.id,
+      model: firstProfile.id,
       prompt: context.executionPrompt,
       taskType: assessment.taskType,
     });
@@ -26,8 +36,8 @@ export class CheapFirstWorkflow implements Workflow {
     context.trace.steps.push({
       stepId: createId("step"),
       role: "executor",
-      model: cheapProfile.id,
-      tier: cheapProfile.tier,
+      model: firstProfile.id,
+      tier: firstProfile.tier,
       latencyMs: firstResponse.latencyMs,
       costUnits: firstResponse.costUnits,
       outputValid: firstEval.passed,
@@ -39,7 +49,7 @@ export class CheapFirstWorkflow implements Workflow {
       return {
         workflow: this.name,
         answer: firstResponse.answer,
-        modelsUsed: [cheapProfile.id],
+        modelsUsed: [firstProfile.id],
         escalated: false,
         latencyMs: firstResponse.latencyMs,
         costUnits: firstResponse.costUnits,
@@ -47,9 +57,9 @@ export class CheapFirstWorkflow implements Workflow {
       };
     }
 
-    const midProfile = this.provider.pickModelByTier("mid", assessment.taskType);
+    const escalateProfile = this.provider.pickModelByTier(escalateTier, assessment.taskType);
     const secondResponse = await this.provider.generate({
-      model: midProfile.id,
+      model: escalateProfile.id,
       prompt: `${context.executionPrompt}\n\nImprove the previous attempt with higher reliability.`,
       taskType: assessment.taskType,
     });
@@ -58,8 +68,8 @@ export class CheapFirstWorkflow implements Workflow {
     context.trace.steps.push({
       stepId: createId("step"),
       role: "executor",
-      model: midProfile.id,
-      tier: midProfile.tier,
+      model: escalateProfile.id,
+      tier: escalateProfile.tier,
       latencyMs: secondResponse.latencyMs,
       costUnits: secondResponse.costUnits,
       outputValid: secondEval.passed,
@@ -71,7 +81,7 @@ export class CheapFirstWorkflow implements Workflow {
     return {
       workflow: this.name,
       answer: secondResponse.answer,
-      modelsUsed: [cheapProfile.id, midProfile.id],
+      modelsUsed: [firstProfile.id, escalateProfile.id],
       escalated: true,
       latencyMs: firstResponse.latencyMs + secondResponse.latencyMs,
       costUnits: firstResponse.costUnits + secondResponse.costUnits,

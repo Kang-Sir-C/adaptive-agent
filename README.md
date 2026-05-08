@@ -4,6 +4,8 @@ An adaptive multi-model orchestration kernel for Node / TypeScript.
 
 Instead of calling one model for every request, Adaptive Agent **triages** each request, picks a **workflow template** (direct / cheap-first with escalation / parallel compare), routes each step to a **model tier**, evaluates the output, and writes a **trace** for every run. Those traces become the dataset you use to refine routing rules over time.
 
+**Drop-in replacement for the OpenAI endpoint.** Point your Cursor / Cline / Claude Code / OpenAI SDK at `http://localhost:3000/v1` and Adaptive Agent will transparently route each request to the right model tier. Zero code changes on the client.
+
 > This is not another model aggregator. It is a small, composable routing + workflow layer you drop into a Node backend. Zero-config mock mode means contributors can run the full pipeline without any API key.
 
 ---
@@ -121,9 +123,31 @@ Outputs workflow distribution, cost / latency per workflow, `cheap_first` escala
 
 ## Connecting a real provider
 
-> **Heads-up.** The model `id`s in `src/config/models.ts` (`qwen3-coder-next`, `sonnet-4.6`, etc.) are placeholders used for mock mode. Your broker almost certainly will not accept them. You must replace them with model names your broker exposes, or every real request will fail with 404 / unknown_model.
+> **Heads-up.** The model `id`s in `src/config/models.ts` are realistic defaults but your broker may expose different ones. You must replace them with model names your broker actually supports, or every real request will fail with 404 / unknown_model.
 
 Adaptive Agent speaks any OpenAI-compatible `chat/completions` endpoint. Any broker exposing that shape works.
+
+### Provider cookbook
+
+| Provider                           | `AA_OPENAI_BASE_URL`                     | Suggested tier mapping for `src/config/models.ts`                                  |
+| ---------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| OpenAI official                    | `https://api.openai.com/v1`              | cheap `gpt-4o-mini`, mid `gpt-4o`, premium `gpt-4-turbo`                           |
+| Anthropic-only relay (e.g. 中转站) | `https://<relay>/v1`                     | cheap `claude-haiku-4-5`, mid `claude-sonnet-4-5`, premium `claude-opus-4-5`       |
+| DeepSeek official                  | `https://api.deepseek.com/v1`            | cheap `deepseek-chat`, mid `deepseek-chat`, premium `deepseek-reasoner`            |
+| Moonshot (Kimi)                    | `https://api.moonshot.cn/v1`             | cheap `moonshot-v1-8k`, mid `moonshot-v1-32k`, premium `moonshot-v1-128k`          |
+| 智谱 GLM                           | `https://open.bigmodel.cn/api/paas/v4`   | cheap `glm-4-flash`, mid `glm-4-air`, premium `glm-4-plus`                         |
+| SiliconFlow (硅基流动)             | `https://api.siliconflow.cn/v1`          | pick any OpenAI-compatible model the platform lists                                |
+| Ollama (local)                     | `http://localhost:11434/v1`              | cheap `llama3.2:3b`, mid `llama3.1:8b`, premium `llama3.1:70b` (or what you have)  |
+| vLLM / TGI (self-hosted)           | `http://<host>:<port>/v1`                | use the exact `--served-model-name` you launched with                              |
+
+To discover what a relay actually exposes, hit `/v1/models` first:
+
+```powershell
+$h = @{ 'Authorization' = 'Bearer YOUR_KEY' }
+Invoke-RestMethod https://your-relay.example.com/v1/models -Headers $h
+```
+
+Then edit `src/config/models.ts` so each profile's `id` matches one of the returned ids. `AA_JUDGE_MODEL` in `.env` must also be a real id.
 
 1. Copy the env template:
 
@@ -150,6 +174,61 @@ Adaptive Agent speaks any OpenAI-compatible `chat/completions` endpoint. Any bro
 ## HTTP API
 
 All endpoints return JSON.
+
+### OpenAI-compatible surface
+
+Adaptive Agent exposes a drop-in OpenAI chat/completions endpoint. Any tool that speaks OpenAI works without code changes.
+
+```bash
+# in whatever is calling you today
+export OPENAI_BASE_URL=http://localhost:3000/v1
+export OPENAI_API_KEY=anything-nonempty
+```
+
+`GET /v1/models` and `POST /v1/chat/completions` both work. Streaming (SSE) is supported. Non-OpenAI metadata (which workflow ran, which models were used, cost units, trace run_id) rides back on an `adaptive` key so you can inspect routing decisions from any client that doesn't strip unknown fields.
+
+### Picking a model: aliases vs direct
+
+The `/v1/models` list mixes two kinds of ids. Clients pick one the same way they pick `gpt-4o`.
+
+**Adaptive aliases** — let AA choose the real model for you:
+
+| alias          | what it does                                       |
+| -------------- | -------------------------------------------------- |
+| `aa-auto`      | full triage, AA picks workflow and tier            |
+| `aa-fast`      | single cheap-tier call, no escalation              |
+| `aa-reliable`  | cheap first, escalate to mid on evaluator failure  |
+| `aa-compare`   | two parallel candidates, judge picks the winner    |
+
+**Real model ids** (`claude-haiku-4-5`, `gpt-4o-mini`, whatever you configured) — passthrough. AA does not re-route, it just forwards to that specific model and writes a trace.
+
+This hybrid is the point: power users who understand AA can pick an alias, regular clients that just want a specific model still work.
+
+### Example
+
+```bash
+npm run smoke:openai
+```
+
+The response body keeps the standard OpenAI shape plus an extra hint:
+
+```json
+{
+  "id": "chatcmpl-run_1778...",
+  "object": "chat.completion",
+  "choices": [{ "message": { "role": "assistant", "content": "..." } }],
+  "adaptive": {
+    "run_id": "run_1778...",
+    "workflow": "cheap_first",
+    "tier": "mid",
+    "models_used": ["qwen3-coder-next", "sonnet-4.6"],
+    "escalated": true,
+    "cost_units": 0.189
+  }
+}
+```
+
+Adaptive Agent's own endpoints (`/run`, `/runs/:id`, `/models`, `/health`) remain available for power users who want the raw RunResult shape.
 
 ### `GET /health`
 
@@ -317,6 +396,7 @@ npm run build        # compile to dist/
 npm run start        # run compiled dist
 npm run check        # typecheck only
 npm run smoke        # HTTP smoke test against a running server
+npm run smoke:openai # verify the OpenAI-compatible surface specifically
 npm run exp:samples  # run every sample through the Orchestrator directly (no HTTP)
 npm run exp:analyze  # aggregate stats across traces/*.json
 ```

@@ -24,7 +24,9 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "exp:samples": "tsx src/experiments/run-samples.ts",
     "exp:analyze": "tsx src/experiments/analyze-traces.ts",
-    "smoke": "tsx src/experiments/smoke.ts"
+    "smoke": "tsx src/experiments/smoke.ts",
+    "smoke:openai": "tsx src/experiments/smoke-openai.ts",
+    "watch": "tsx src/experiments/watch-traces.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

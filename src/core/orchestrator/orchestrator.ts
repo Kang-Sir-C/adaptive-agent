@@ -12,6 +12,8 @@ import { BudgetManager } from "../budget/budget-manager.js";
 import { TriageService } from "../triage/triage-service.js";
 import type { RunContext } from "./run-context.js";
 import { WorkflowFactory } from "../workflow/workflow-factory.js";
+import { PassthroughWorkflow } from "../workflow/passthrough-workflow.js";
+import { AggregateEvaluator } from "../evaluator/aggregate-evaluator.js";
 
 export class Orchestrator {
   private readonly provider = new BrokerProvider(new OpenAICompatibleAdapter());
@@ -35,7 +37,15 @@ export class Orchestrator {
     const builtContext = this.contextBuilder.build(request, sessionState);
 
     const { assessment } = this.triageService.assess(request);
-    const budgetTemplate = workflowDefaults[assessment.workflow as keyof typeof workflowDefaults] ?? workflowDefaults.direct;
+
+    // Honor caller-supplied routing overrides:
+    // - forceWorkflow: keep triage, swap the workflow template
+    // - forceModel: bypass tier selection entirely (passthrough to a specific model)
+    const effectiveAssessment = request.routing?.forceWorkflow
+      ? { ...assessment, workflow: request.routing.forceWorkflow }
+      : assessment;
+
+    const budgetTemplate = workflowDefaults[effectiveAssessment.workflow as keyof typeof workflowDefaults] ?? workflowDefaults.direct;
     const budgetManager = new BudgetManager({
       ...budgetTemplate,
       currentRounds: 0,
@@ -50,8 +60,8 @@ export class Orchestrator {
         mode: request.mode,
         userInput: request.userInput,
       },
-      assessment,
-      workflow: assessment.workflow,
+      assessment: effectiveAssessment,
+      workflow: request.routing?.forceModel ? "direct" : effectiveAssessment.workflow,
       steps: [
         {
           stepId: createId("step"),
@@ -59,7 +69,11 @@ export class Orchestrator {
           latencyMs: 0,
           costUnits: 0,
           outputValid: true,
-          notes: assessment.reasons,
+          notes: [
+            ...effectiveAssessment.reasons,
+            ...(request.routing?.forceModel ? [`override=forceModel:${request.routing.forceModel}`] : []),
+            ...(request.routing?.forceWorkflow ? [`override=forceWorkflow:${request.routing.forceWorkflow}`] : []),
+          ],
         },
       ],
     };
@@ -69,13 +83,15 @@ export class Orchestrator {
       sessionState,
       executionPrompt: builtContext.executionInput,
       reviewPrompt: builtContext.reviewInput,
-      assessment,
+      assessment: effectiveAssessment,
       budget: budgetManager.live(),
       trace,
       intermediate: {},
     };
 
-    const workflow = this.workflowFactory.create(assessment.workflow);
+    const workflow = request.routing?.forceModel
+      ? new PassthroughWorkflow(this.provider, new AggregateEvaluator(), request.routing.forceModel)
+      : this.workflowFactory.create(effectiveAssessment.workflow);
     budgetManager.beginRound();
     const workflowResult = await workflow.execute(context);
     budgetManager.recordUsage(workflowResult.costUnits);
@@ -101,7 +117,7 @@ export class Orchestrator {
         latencyMs: workflowResult.latencyMs,
         costUnits: workflowResult.costUnits,
         confidence: workflowResult.confidence,
-        tier: assessment.modelTier,
+        tier: request.routing?.forceModel ? undefined : effectiveAssessment.modelTier,
       },
     };
   }

@@ -1,9 +1,9 @@
 {
   "name": "high-risk-security",
-  "description": "High-risk production change. Expected: cheap_first (risk=high), target tier is mid because the request has code context.",
+  "description": "High-risk production change with migration keyword. Expected: cheap_first (risk=high), tier=premium because risk=high + complexity=high.",
   "expected": {
     "workflow": "cheap_first",
-    "modelTier": "mid"
+    "modelTier": "premium"
   },
   "request": {
     "mode": "code",

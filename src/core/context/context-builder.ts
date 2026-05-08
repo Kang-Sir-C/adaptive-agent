@@ -8,7 +8,7 @@ export type BuiltContext = {
 
 export class ContextBuilder {
   build(request: RunRequest, sessionState: SessionState): BuiltContext {
-    const selectedText = request.context?.selectedText ? `\nSelected:\n${request.context.selectedText}` : "";
+    const selectedText = request.context?.selectedText ?? "";
     const currentFile = request.context?.currentFile
       ? `\nCurrent file: ${request.context.currentFile.path}\n${request.context.currentFile.content}`
       : "";
@@ -17,12 +17,19 @@ export class ContextBuilder {
       : "";
     const facts = sessionState.relevantFacts.length ? `\nFacts:\n${sessionState.relevantFacts.join("\n")}` : "";
 
-    const base = `User request:\n${request.userInput}${selectedText}${currentFile}${relatedFiles}${facts}`;
+    // When selectedText is a full conversation prompt (from OpenAI bridge),
+    // use it directly as the execution input. Otherwise build from parts.
+    const isFullPrompt = selectedText.length > request.userInput.length * 2;
+    const executionInput = isFullPrompt
+      ? selectedText
+      : `User request:\n${request.userInput}${selectedText ? `\nSelected:\n${selectedText}` : ""}${currentFile}${relatedFiles}${facts}`;
+
+    const base = `User request:\n${request.userInput}${selectedText ? `\nContext:\n${selectedText.slice(0, 600)}` : ""}${currentFile}${relatedFiles}${facts}`;
 
     return {
       triageInput: `Mode: ${request.mode}\n${base}`,
-      executionInput: base,
-      reviewInput: `Review target:\n${base}`,
+      executionInput,
+      reviewInput: `Review target:\n${executionInput}`,
     };
   }
 }

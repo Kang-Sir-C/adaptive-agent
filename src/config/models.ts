@@ -3,97 +3,136 @@ import type { ModelProfile } from "../models/profiles/model-profiles.js";
 /**
  * Model profiles used by BrokerProvider to pick by tier and task strengths.
  *
- * ⚠️ IMPORTANT: The `id` values below are PLACEHOLDERS for mock mode.
- * When you enable a real provider (`AA_PROVIDER_ENABLED=true`), every `id`
- * here must match a model name your broker actually accepts, otherwise the
- * HTTP call will fail with 404 / unknown_model.
+ * ⚠️ IMPORTANT: The `id` values below MUST match whatever your broker accepts.
+ * When AA_PROVIDER_ENABLED=true, these ids are sent on the wire verbatim. A
+ * typo or a model your broker does not expose will return 404 / unknown_model.
  *
- * Typical mapping when switching to a real OpenAI-compatible broker:
- *   cheap tier  -> deepseek-chat, qwen-turbo, gpt-4o-mini, etc.
- *   mid tier    -> claude-3-5-sonnet, gpt-4o, etc.
- *   premium tier-> claude-opus-4, gpt-4-turbo, etc.
+ * The defaults here are realistic Anthropic-style ids that work against most
+ * OpenAI-compatible relays that proxy Claude. If your broker exposes other
+ * models (gpt-4o, deepseek-chat, qwen, ...) replace the ids and the strengths
+ * table to match.
  *
- * Also remember to set AA_JUDGE_MODEL in .env to a real model id.
+ * Remember to also set AA_JUDGE_MODEL in .env to a real id.
  */
 export const modelProfiles: ModelProfile[] = [
   {
-    id: "qwen3-coder-next",
-    label: "Qwen3 Coder Next",
+    id: "claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
     tier: "cheap",
-    multiplier: 0.05,
+    multiplier: 0.2,
     avgLatencyMs: 1200,
-    availability: 0.95,
-    stability: 0.72,
-    supportsStructuredOutput: true,
-    supportsTools: false,
-    strengths: {
-      chat: 0.62,
-      doc_qa: 0.6,
-      code_generate: 0.78,
-      code_edit: 0.8,
-      debug: 0.68,
-      review: 0.61,
-      analysis: 0.64,
-    },
-  },
-  {
-    id: "deepseek-v3.2",
-    label: "Deepseek v3.2",
-    tier: "cheap",
-    multiplier: 0.25,
-    avgLatencyMs: 1500,
-    availability: 0.93,
-    stability: 0.78,
-    supportsStructuredOutput: true,
-    supportsTools: false,
-    strengths: {
-      chat: 0.72,
-      doc_qa: 0.73,
-      code_generate: 0.76,
-      code_edit: 0.74,
-      debug: 0.75,
-      review: 0.69,
-      analysis: 0.77,
-    },
-  },
-  {
-    id: "sonnet-4.6",
-    label: "Sonnet 4.6",
-    tier: "mid",
-    multiplier: 1.3,
-    avgLatencyMs: 2600,
     availability: 0.97,
-    stability: 0.9,
+    stability: 0.85,
     supportsStructuredOutput: true,
     supportsTools: true,
     strengths: {
-      chat: 0.88,
-      doc_qa: 0.88,
-      code_generate: 0.9,
-      code_edit: 0.91,
-      debug: 0.89,
-      review: 0.88,
-      analysis: 0.87,
+      chat: 0.82,
+      doc_qa: 0.8,
+      code_generate: 0.78,
+      code_edit: 0.78,
+      debug: 0.76,
+      review: 0.75,
+      analysis: 0.78,
     },
   },
   {
-    id: "opus-4.6",
-    label: "Opus 4.6",
+    id: "claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    tier: "mid",
+    multiplier: 1.0,
+    avgLatencyMs: 2400,
+    availability: 0.97,
+    stability: 0.92,
+    supportsStructuredOutput: true,
+    supportsTools: true,
+    strengths: {
+      chat: 0.9,
+      doc_qa: 0.9,
+      code_generate: 0.92,
+      code_edit: 0.93,
+      debug: 0.9,
+      review: 0.9,
+      analysis: 0.9,
+    },
+  },
+  {
+    id: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    tier: "mid",
+    multiplier: 1.1,
+    avgLatencyMs: 2500,
+    availability: 0.96,
+    stability: 0.93,
+    supportsStructuredOutput: true,
+    supportsTools: true,
+    strengths: {
+      chat: 0.91,
+      doc_qa: 0.91,
+      code_generate: 0.93,
+      code_edit: 0.94,
+      debug: 0.91,
+      review: 0.91,
+      analysis: 0.91,
+    },
+  },
+  {
+    id: "claude-opus-4-5",
+    label: "Claude Opus 4.5",
     tier: "premium",
-    multiplier: 2.2,
-    avgLatencyMs: 4200,
+    multiplier: 2.5,
+    avgLatencyMs: 3800,
     availability: 0.95,
     stability: 0.94,
     supportsStructuredOutput: true,
     supportsTools: true,
     strengths: {
       chat: 0.94,
-      doc_qa: 0.93,
-      code_generate: 0.93,
+      doc_qa: 0.94,
+      code_generate: 0.94,
       code_edit: 0.94,
       debug: 0.95,
-      review: 0.94,
+      review: 0.95,
       analysis: 0.95,
+    },
+  },
+  {
+    id: "claude-opus-4-6",
+    label: "Claude Opus 4.6",
+    tier: "premium",
+    multiplier: 2.6,
+    avgLatencyMs: 4000,
+    availability: 0.94,
+    stability: 0.94,
+    supportsStructuredOutput: true,
+    supportsTools: true,
+    strengths: {
+      chat: 0.95,
+      doc_qa: 0.95,
+      code_generate: 0.945,
+      code_edit: 0.945,
+      debug: 0.955,
+      review: 0.955,
+      analysis: 0.955,
+    },
+  },
+  {
+    id: "claude-opus-4-7",
+    label: "Claude Opus 4.7",
+    tier: "premium",
+    multiplier: 2.7,
+    avgLatencyMs: 4200,
+    availability: 0.93,
+    stability: 0.95,
+    supportsStructuredOutput: true,
+    supportsTools: true,
+    strengths: {
+      chat: 0.96,
+      doc_qa: 0.96,
+      code_generate: 0.95,
+      code_edit: 0.95,
+      debug: 0.96,
+      review: 0.96,
+      analysis: 0.96,
     },
   },
 ];

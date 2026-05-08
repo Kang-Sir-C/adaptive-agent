@@ -1,0 +1,19 @@
+{
+  "name": "review-compare",
+  "description": "Review request with parallel allowed and no high-risk keywords. Expected: compare workflow.",
+  "expected": {
+    "workflow": "compare",
+    "modelTier": "mid"
+  },
+  "request": {
+    "mode": "review",
+    "userInput": "Review this function and tell me whether the approach is correct.",
+    "preferences": {
+      "allowParallel": true,
+      "priority": "quality"
+    },
+    "context": {
+      "selectedText": "function sum(items) {\n  let total = 0;\n  for (const item of items) total += item.value;\n  return total;\n}"
+    }
+  }
+}

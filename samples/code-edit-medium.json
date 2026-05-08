@@ -1,0 +1,19 @@
+{
+  "name": "code-edit-medium",
+  "description": "Medium code edit with selected text. Expected: cheap_first workflow, mid tier.",
+  "expected": {
+    "workflow": "cheap_first",
+    "modelTier": "mid"
+  },
+  "request": {
+    "mode": "code",
+    "userInput": "Refactor this function to use async/await and add input validation.",
+    "context": {
+      "selectedText": "function fetchUser(id) { return fetch('/api/users/' + id).then(r => r.json()); }",
+      "currentFile": {
+        "path": "src/user.js",
+        "content": "function fetchUser(id) { return fetch('/api/users/' + id).then(r => r.json()); }\n\nmodule.exports = { fetchUser };"
+      }
+    }
+  }
+}

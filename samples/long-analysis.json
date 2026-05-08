@@ -1,0 +1,22 @@
+{
+  "name": "long-analysis",
+  "description": "Long input with related files. Expected: cheap_first, premium tier due to high complexity.",
+  "expected": {
+    "workflow": "cheap_first",
+    "modelTier": "premium"
+  },
+  "request": {
+    "mode": "chat",
+    "userInput": "Analyze the following module hierarchy and propose a refactor plan. Pay attention to cyclic imports between the auth, user, and session packages, and consider backward compatibility for external integrators. Include a migration sequence that can be applied in stages without downtime.",
+    "context": {
+      "currentFile": {
+        "path": "src/auth/index.ts",
+        "content": "import { User } from '../user';\nimport { Session } from '../session';\nexport const login = (u: User) => new Session(u);\n"
+      },
+      "relatedFiles": [
+        { "path": "src/user/index.ts", "content": "import { Session } from '../session';\nexport class User { constructor(public id: string, public session?: Session) {} }\n" },
+        { "path": "src/session/index.ts", "content": "import { User } from '../user';\nexport class Session { constructor(public user: User) {} }\n" }
+      ]
+    }
+  }
+}

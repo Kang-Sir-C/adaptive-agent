@@ -1,0 +1,18 @@
+{
+  "name": "high-risk-security",
+  "description": "High-risk production change. Expected: cheap_first (risk=high), target tier is mid because the request has code context.",
+  "expected": {
+    "workflow": "cheap_first",
+    "modelTier": "mid"
+  },
+  "request": {
+    "mode": "code",
+    "userInput": "Update the production database migration to drop the legacy auth column safely.",
+    "context": {
+      "currentFile": {
+        "path": "migrations/2024_03_drop_legacy_auth.sql",
+        "content": "-- pending migration\n"
+      }
+    }
+  }
+}

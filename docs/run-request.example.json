@@ -1,0 +1,11 @@
+{
+  "mode": "review",
+  "userInput": "Compare two possible implementations for this requirement and tell me which one is safer.",
+  "preferences": {
+    "allowParallel": true,
+    "priority": "quality"
+  },
+  "context": {
+    "selectedText": "function login(user) { return user.name; }"
+  }
+}

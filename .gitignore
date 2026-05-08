@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+
+# Local run traces. Keep committed demo traces in place if you want by name.
+traces/run_*.json

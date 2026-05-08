@@ -1,0 +1,12 @@
+{
+  "name": "chat-simple",
+  "description": "Short chat question. Expected: direct workflow, cheap tier.",
+  "expected": {
+    "workflow": "direct",
+    "modelTier": "cheap"
+  },
+  "request": {
+    "mode": "chat",
+    "userInput": "What is the capital of France?"
+  }
+}

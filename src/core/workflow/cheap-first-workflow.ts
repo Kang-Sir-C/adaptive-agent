@@ -57,10 +57,36 @@ export class CheapFirstWorkflow implements Workflow {
       };
     }
 
+    // Check budget before escalating
     const escalateProfile = this.provider.pickModelByTier(escalateTier, assessment.taskType);
+    const estimatedEscalateCost = escalateProfile.multiplier * 0.5;
+    const budgetAllows = context.budget.currentCostUnits + firstResponse.costUnits + estimatedEscalateCost <= context.budget.maxCostUnits;
+
+    if (!budgetAllows) {
+      // Budget exhausted — return the first result even though it failed evaluation
+      context.trace.steps.push({
+        stepId: createId("step"),
+        role: "executor",
+        tier: escalateTier,
+        latencyMs: 0,
+        costUnits: 0,
+        outputValid: false,
+        notes: ["escalation skipped: budget exceeded"],
+      });
+      return {
+        workflow: this.name,
+        answer: firstResponse.answer,
+        modelsUsed: [firstProfile.id],
+        escalated: false,
+        latencyMs: firstResponse.latencyMs,
+        costUnits: firstResponse.costUnits,
+        confidence: firstEval.score,
+      };
+    }
+
     const secondResponse = await this.provider.generate({
       model: escalateProfile.id,
-      prompt: `${context.executionPrompt}\n\nImprove the previous attempt with higher reliability.`,
+      prompt: context.executionPrompt,
       taskType: assessment.taskType,
     });
     const secondEval = this.evaluator.evaluate({ answer: secondResponse.answer, assessment });

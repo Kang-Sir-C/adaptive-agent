@@ -56,12 +56,13 @@ function joinMessages(messages: OpenAIChatRequest["messages"]): string {
   const conversationParts: string[] = [];
 
   for (const m of messages) {
-    if (typeof m.content !== "string" || m.content.length === 0) continue;
+    const content = m.content ?? "";
+    if (content.length === 0) continue;
     if (m.role === "system") {
-      systemParts.push(m.content);
+      systemParts.push(content);
     } else {
       const prefix = m.role === "user" ? "User: " : m.role === "assistant" ? "Assistant: " : `${m.role}: `;
-      conversationParts.push(`${prefix}${m.content}`);
+      conversationParts.push(`${prefix}${content}`);
     }
   }
 

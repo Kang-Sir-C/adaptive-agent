@@ -1,8 +1,14 @@
 # Adaptive Agent
 
-**Stop paying for Opus when Haiku is enough.**
+**自适应多模型编排代理 — 不是选模型，而是选工作流。**
 
-Adaptive Agent is a local proxy that sits between your LLM client and your provider. It looks at each request, decides which model tier actually fits, and routes accordingly — cheap model first, escalate only when needed, compare in parallel when it matters. Every decision is traced so you can see exactly what happened and why.
+Adaptive Agent 是一个自适应多模型编排代理。它不是又一个模型聚合器或 API 网关，而是一个能根据任务自动决定"该怎么干、该谁来干"的智能路由层。
+
+核心理念很简单：大多数请求不需要最贵的模型。一个简单问答用 Haiku 就够了，一段代码重构可以先让便宜模型试，失败了再升级，一个关键审查值得让两个模型并行比较再由裁判选优。Adaptive Agent 把这套决策逻辑做成了自动化系统——先分诊任务类型和复杂度，再选择工作流模板，再按成本和能力路由模型，最后用评估器验证结果、必要时升级重试。每次决策全程留痕，形成可分析的 trace 数据，为后续路由优化提供真实依据。
+
+它以 OpenAI-compatible 代理的形式运行，任何支持 OpenAI API 的客户端（Cursor、Cline、Claude Code、任意 SDK）只需改一行 base URL 就能接入，零代码改动。
+
+**Stop paying for Opus when Haiku is enough.**
 
 **One line to start using it:**
 
@@ -20,14 +26,21 @@ Works with Cursor, Cline, Continue, Narrafork, any OpenAI SDK, any OpenAI-compat
 |---|---|---|---|---|
 | Routes between models | ❌ you pick | ❌ you pick | ✅ binary cheap/strong | ✅ three-tier + workflow |
 | Workflow-level decisions | ❌ | ❌ | ❌ | ✅ direct / cheap_first / compare |
-| Evaluator-driven escalation | ❌ | ❌ | ❌ | ✅ fail → upgrade |
-| Parallel compare + judge | ❌ | ❌ | ❌ | ✅ |
+| Evaluator-driven escalation | ❌ | ❌ | ❌ | ✅ fail → upgrade (budget-aware) |
+| Parallel compare + judge | ❌ | ❌ | ❌ | ✅ (fault-tolerant) |
 | Per-run trace with full decision log | ❌ | ❌ | ❌ | ✅ |
+| Error recovery + trace on failure | ❌ | ❌ | ❌ | ✅ |
 | Mock mode (no API key needed) | ❌ | ❌ | ❌ | ✅ |
 | Node/TypeScript native | ❌ Python | ✅ Python | ❌ Python | ✅ |
 | Drop-in OpenAI proxy | ❌ | ✅ | ❌ | ✅ |
 
 **Core insight:** The question isn't "which model?" — it's "which workflow?" A simple chat needs one cheap call. A code refactor needs cheap-first with escalation. A critical review needs two models compared by a judge. Adaptive Agent picks the workflow first, then picks the models.
+
+**Reliability built in:**
+- Budget-aware escalation — won't upgrade if cost ceiling is reached
+- Fault-tolerant compare — if one candidate model fails, the surviving one is returned instead of crashing
+- Error traces — even failed runs get their trace persisted for debugging
+- Graceful degradation — provider timeouts and errors produce structured error responses, never raw 500s
 
 ---
 
@@ -186,21 +199,21 @@ npm run exp:analyze  # workflow distribution, escalation rate, model usage, judg
 
 ```
 src/
-  app/                 Express server + OpenAI-compatible routes
+  app/                 Express server + OpenAI-compatible routes + error handling
   core/
-    triage/            rule-based task classification
+    triage/            rule-based task classification (EN + CN keywords)
     workflow/          direct / cheap_first / compare / passthrough
-    evaluator/         schema + rules + judge
-    orchestrator/      top-level run loop
-    budget/            per-run cost/latency tracking
-    context/           prompt assembly
-  providers/           ModelProvider interface + OpenAI adapter
+    evaluator/         schema + rules + judge (graded scoring)
+    orchestrator/      top-level run loop with error recovery
+    budget/            per-run cost/latency tracking and enforcement
+    context/           prompt assembly (role-specific)
+  providers/           ModelProvider interface + OpenAI adapter (mock/real dual-mode)
   models/              TypeScript schemas
   config/              model profiles, routing rules, workflow budgets
   storage/             trace persistence
   experiments/         smoke tests + trace analyzer + watch
 samples/               canned test inputs
-traces/                per-run JSON traces
+traces/                per-run JSON traces (auto-generated)
 ```
 
 ---
@@ -230,22 +243,23 @@ Contributions welcome. Pick one and open a PR.
 - [ ] **LLM-based triage option**: use Haiku itself (0.3s, ~$0.001) to classify task type and complexity instead of keyword rules. Much more accurate for ambiguous inputs.
 - [ ] **Evaluator signals for escalation**: current evaluator is too lenient — Haiku almost never fails. Add task-specific rubrics (code must compile, JSON must parse, analysis must have structure).
 - [ ] **Conversation context inheritance**: if the previous turn was `code_edit/high`, a follow-up "continue" should inherit that classification, not reset to `chat/low`.
+- [ ] **Judge cost tracking**: record judge model's token usage and cost in the compare workflow trace step.
 
 ### Medium priority
 
 - [ ] **`plan_execute` workflow**: for multi-step tasks, plan first (cheap), then execute each step (appropriate tier).
 - [ ] **Trace-based routing learning**: use accumulated traces to train a lightweight classifier that replaces or augments keyword rules.
 - [ ] **Cost tracking dashboard**: simple HTML page served at `/dashboard` showing real-time cost savings vs always-premium baseline.
-- [ ] **Fallback on provider errors**: if the chosen model returns 429/5xx, automatically retry with a different model in the same tier.
+- [ ] **Multi-provider routing**: route different tiers to different providers (e.g., cheap → DeepSeek, premium → Anthropic).
 - [ ] **Anthropic `/v1/messages` endpoint**: support Claude Code and native Anthropic SDK clients directly without needing a relay.
 
 ### Low priority / future
 
-- [ ] **Multi-provider routing**: route different tiers to different providers (e.g., cheap → DeepSeek, premium → Anthropic).
 - [ ] **Token budget enforcement**: hard cap on tokens per run, not just cost units.
 - [ ] **Plugin system**: let users register custom evaluators, triage rules, or workflows without forking.
 - [ ] **Retrieval integration**: feed `retrievedDocs` from a real vector store.
 - [ ] **WebSocket support**: for clients that prefer WS over SSE.
+- [ ] **Online learning**: bandit-style policy that adjusts tier selection based on accumulated trace outcomes.
 
 ---
 

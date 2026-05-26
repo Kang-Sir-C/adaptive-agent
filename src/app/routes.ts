@@ -27,21 +27,25 @@ export const createRouter = (orchestrator: Orchestrator) => {
     res.json(trace);
   });
 
-  router.post("/run", async (req: Request<object, RunApiResponse, RunApiRequest>, res: Response<RunApiResponse>) => {
+  router.post("/run", async (req: Request<object, RunApiResponse, RunApiRequest>, res: Response) => {
     const body = req.body;
     const runId = body.runId ?? createId("run");
     const sessionId = body.sessionId ?? createId("session");
 
-    const result = await orchestrator.run({
-      runId,
-      sessionId,
-      userInput: body.userInput,
-      mode: body.mode,
-      context: body.context,
-      preferences: body.preferences,
-    });
-
-    res.json(result);
+    try {
+      const result = await orchestrator.run({
+        runId,
+        sessionId,
+        userInput: body.userInput,
+        mode: body.mode,
+        context: body.context,
+        preferences: body.preferences,
+      });
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "internal error";
+      res.status(502).json({ error: { message, type: "upstream_error", runId } });
+    }
   });
 
   // -------- OpenAI-compatible surface --------

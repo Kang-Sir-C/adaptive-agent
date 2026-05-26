@@ -24,6 +24,8 @@ export class Orchestrator {
   private readonly workflowFactory = new WorkflowFactory(this.provider);
 
   async run(request: RunRequest): Promise<RunResult> {
+    const startMs = Date.now();
+
     const sessionState: SessionState = {
       sessionId: request.sessionId,
       constraints: [],
@@ -89,18 +91,42 @@ export class Orchestrator {
       intermediate: {},
     };
 
-    const workflow = request.routing?.forceModel
-      ? new PassthroughWorkflow(this.provider, new AggregateEvaluator(), request.routing.forceModel)
-      : this.workflowFactory.create(effectiveAssessment.workflow);
-    budgetManager.beginRound();
-    const workflowResult = await workflow.execute(context);
-    budgetManager.recordUsage(workflowResult.costUnits);
+    let workflowResult;
+    try {
+      const workflow = request.routing?.forceModel
+        ? new PassthroughWorkflow(this.provider, new AggregateEvaluator(), request.routing.forceModel)
+        : this.workflowFactory.create(effectiveAssessment.workflow);
+      budgetManager.beginRound();
+      workflowResult = await workflow.execute(context);
+      budgetManager.recordUsage(workflowResult.costUnits);
+    } catch (error) {
+      // Record the failure in trace and persist it before re-throwing
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      trace.steps.push({
+        stepId: createId("step"),
+        role: "executor",
+        latencyMs: Date.now() - startMs,
+        costUnits: 0,
+        outputValid: false,
+        notes: [`error: ${errorMessage}`],
+      });
+      this.traceRecorder.finalize(trace, {
+        answer: "",
+        modelsUsed: [],
+        escalated: false,
+        latencyMs: Date.now() - startMs,
+        costUnits: budgetManager.snapshot().currentCostUnits,
+      });
+      await this.traceStore.save(trace).catch(() => {});
+      throw error;
+    }
 
+    const totalLatencyMs = Date.now() - startMs;
     this.traceRecorder.finalize(trace, {
       answer: workflowResult.answer,
       modelsUsed: workflowResult.modelsUsed,
       escalated: workflowResult.escalated,
-      latencyMs: workflowResult.latencyMs,
+      latencyMs: totalLatencyMs,
       costUnits: workflowResult.costUnits,
     });
 
@@ -114,7 +140,7 @@ export class Orchestrator {
         workflow: workflowResult.workflow,
         modelsUsed: workflowResult.modelsUsed,
         escalated: workflowResult.escalated,
-        latencyMs: workflowResult.latencyMs,
+        latencyMs: totalLatencyMs,
         costUnits: workflowResult.costUnits,
         confidence: workflowResult.confidence,
         tier: request.routing?.forceModel ? undefined : effectiveAssessment.modelTier,

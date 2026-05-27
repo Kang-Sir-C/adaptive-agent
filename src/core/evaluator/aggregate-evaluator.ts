@@ -32,16 +32,21 @@ export class AggregateEvaluator {
           length: schema.length,
           notRefusal: rules.notRefusal,
           notTruncated: rules.notTruncated,
+          taskSpecificOk: rules.taskSpecificOk,
         },
         recommendedAction: "escalate",
       };
     }
 
     if (!rules.passed) {
-      const severity = !rules.notRefusal || !rules.notTruncated ? "escalate" : "retry";
+      // Determine severity: refusal/truncation are hard fails, task-specific
+      // issues are softer (the model tried but output quality is insufficient)
+      const hardFail = !rules.notRefusal || !rules.notTruncated;
+      const severity = hardFail ? "escalate" : !rules.taskSpecificOk ? "escalate" : "retry";
+      const score = hardFail ? 0.3 : 0.45;
       return {
         passed: false,
-        score: 0.45,
+        score,
         reasons: reasons.length > 0 ? reasons : ["rule evaluation failed"],
         signals: {
           schema: true,
@@ -50,20 +55,22 @@ export class AggregateEvaluator {
           length: schema.length,
           notRefusal: rules.notRefusal,
           notTruncated: rules.notTruncated,
+          taskSpecificOk: rules.taskSpecificOk,
         },
         recommendedAction: severity,
       };
     }
 
-    // Graduated pass score. Structured output getting valid JSON is a strong signal.
+    // Graduated pass score. More positive signals = higher confidence.
     let score = 0.75;
     if (schema.jsonValid === true) score += 0.1;
     if (schema.length > 200) score += 0.05;
+    if (rules.taskSpecificOk) score += 0.05;
 
     return {
       passed: true,
       score: Math.min(0.95, score),
-      reasons: ["basic evaluation passed"],
+      reasons: ["evaluation passed"],
       signals: {
         schema: true,
         rules: true,
@@ -71,6 +78,7 @@ export class AggregateEvaluator {
         length: schema.length,
         notRefusal: rules.notRefusal,
         notTruncated: rules.notTruncated,
+        taskSpecificOk: rules.taskSpecificOk,
       },
       recommendedAction: "accept",
     };

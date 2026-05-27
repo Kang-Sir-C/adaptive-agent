@@ -91,6 +91,9 @@ export class CheapFirstWorkflow implements Workflow {
     });
     const secondEval = this.evaluator.evaluate({ answer: secondResponse.answer, assessment });
 
+    // Track whether escalation actually helped
+    const doubleFailure = !secondEval.passed;
+
     context.trace.steps.push({
       stepId: createId("step"),
       role: "executor",
@@ -101,7 +104,10 @@ export class CheapFirstWorkflow implements Workflow {
       outputValid: secondEval.passed,
       evaluatorScore: secondEval.score,
       escalated: true,
-      notes: secondEval.reasons,
+      notes: [
+        ...secondEval.reasons,
+        ...(doubleFailure ? ["doubleFailure: escalated model also failed evaluation"] : []),
+      ],
     });
 
     return {
@@ -111,7 +117,8 @@ export class CheapFirstWorkflow implements Workflow {
       escalated: true,
       latencyMs: firstResponse.latencyMs + secondResponse.latencyMs,
       costUnits: firstResponse.costUnits + secondResponse.costUnits,
-      confidence: secondEval.score,
+      // If escalated model also failed, confidence is very low
+      confidence: doubleFailure ? Math.min(0.3, secondEval.score) : secondEval.score,
     };
   }
 }

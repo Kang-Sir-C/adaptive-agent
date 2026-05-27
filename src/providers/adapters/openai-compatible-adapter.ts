@@ -153,11 +153,11 @@ export class OpenAICompatibleAdapter implements ModelProvider {
     // When AA_MOCK_CHEAP_FAIL=true, cheap-tier mock outputs are intentionally
     // too short / non-JSON so that evaluators fail and trigger escalation paths.
     const cheapFail = process.env.AA_MOCK_CHEAP_FAIL === "true";
-    const cheapTierModel = /qwen3-coder-next|deepseek-v3\.2/i.test(request.model);
+    const cheapTierModel = /haiku|qwen3-coder-next|deepseek-v3\.2|minimax/i.test(request.model);
     if (cheapFail && cheapTierModel) {
       return {
         model: request.model,
-        answer: "...",
+        answer: "I can help with that.",
         latencyMs,
         costUnits: Math.max(0.05, request.prompt.length / 1000),
         raw: { mocked: true, degraded: true },

@@ -8,6 +8,7 @@ export type EvaluationSignals = {
   length?: number;
   notRefusal?: boolean;
   notTruncated?: boolean;
+  taskSpecificOk?: boolean;
 };
 
 export type EvaluationResult = {

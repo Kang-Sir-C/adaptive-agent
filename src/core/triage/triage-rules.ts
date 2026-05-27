@@ -33,10 +33,10 @@ export class TriageRules {
 
     // ─── Workflow ───────────────────────────────────────────────────────
     const parallelAllowed = request.preferences?.allowParallel ?? false;
-    const workflow = this.selectWorkflow(taskType, complexity, risk, parallelAllowed);
+    const priority = request.preferences?.priority;
 
     // ─── Model Tier ─────────────────────────────────────────────────────
-    const modelTier = this.selectTier(complexity, risk, taskType);
+    const modelTier = this.selectTier(complexity, risk, taskType, priority);
 
     // ─── Confidence ─────────────────────────────────────────────────────
     const confidence = this.scoreConfidence({
@@ -45,13 +45,18 @@ export class TriageRules {
       taskType, complexity, risk,
     });
 
+    // ─── Workflow (depends on confidence + priority) ─────────────────────
+    const workflow = this.selectWorkflow(taskType, complexity, risk, parallelAllowed, priority, confidence);
+
     const reasons = [
       `taskType=${taskType}`,
       `complexity=${complexity}`,
       `risk=${risk}`,
       `workflow=${workflow}`,
       `tier=${modelTier}`,
+      `confidence=${confidence}`,
       parallelAllowed ? "parallel=allowed" : "parallel=denied",
+      ...(priority && priority !== "balanced" ? [`priority=${priority}`] : []),
     ];
 
     return {
@@ -156,7 +161,29 @@ export class TriageRules {
     complexity: Complexity,
     risk: RiskLevel,
     parallelAllowed: boolean,
+    priority?: string,
+    confidence?: number,
   ): WorkflowName {
+    // Priority overrides: speed wants minimal work, quality wants more validation
+    if (priority === "speed") {
+      // Speed mode: direct for low/medium, cheap_first only for high
+      if (complexity === "high" || risk === "high") return "cheap_first";
+      return "direct";
+    }
+    if (priority === "quality") {
+      // Quality mode: prefer compare when parallel allowed, otherwise cheap_first
+      if (parallelAllowed) return "compare";
+      return "cheap_first";
+    }
+
+    // Low confidence from triage = uncertain classification, be more cautious
+    // Exception: chat/low is genuinely simple — low confidence there just means
+    // the input is short/ambiguous, not that it needs a stronger model.
+    if (confidence !== undefined && confidence < 0.5 && !(taskType === "chat" && complexity === "low")) {
+      if (parallelAllowed) return "compare";
+      return "cheap_first";
+    }
+
     // High risk: always cheap_first so we get cheap validation before committing
     if (risk === "high") return "cheap_first";
 
@@ -173,7 +200,22 @@ export class TriageRules {
 
   // ─── Tier Selection ─────────────────────────────────────────────────────
 
-  private selectTier(complexity: Complexity, risk: RiskLevel, taskType: TaskType): ModelTier {
+  private selectTier(complexity: Complexity, risk: RiskLevel, taskType: TaskType, priority?: string): ModelTier {
+    // Priority adjustments
+    if (priority === "speed" || priority === "cost") {
+      // Downgrade tier by one level for speed/cost priority
+      if (risk === "high" && complexity === "high") return "mid"; // would be premium
+      if (complexity === "high") return "mid"; // would be premium
+      if (complexity === "medium") return "cheap"; // would be mid
+      return "cheap";
+    }
+    if (priority === "quality") {
+      // Upgrade tier by one level for quality priority
+      if (complexity === "low") return "mid"; // would be cheap
+      if (complexity === "medium") return "premium"; // would be mid
+      return "premium";
+    }
+
     // High risk + high complexity = premium (we need the best judgment)
     if (risk === "high" && complexity === "high") return "premium";
 

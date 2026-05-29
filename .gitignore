@@ -9,3 +9,14 @@ traces/
 
 # Paper design docs — academic work stays private
 docs/paper-*.md
+docs/model-selection-guide.md
+
+# Experiment scripts — methodology stays private until paper is published
+src/experiments/extended-matrix.ts
+src/experiments/model-task-matrix.ts
+src/experiments/rerun-glm.ts
+src/experiments/simulate-routing.ts
+src/experiments/analyze-extended.ts
+src/experiments/compare-baselines.ts
+src/experiments/verify-optimal-stopping.ts
+

@@ -44,6 +44,27 @@ Works with Cursor, Cline, Continue, Narrafork, any OpenAI SDK, any OpenAI-compat
 
 ---
 
+## Why routing pays off
+
+We measured 10 open models across a range of software development tasks. The
+takeaway is blunt: **paying for the biggest model is mostly wasted money.**
+
+- A mid-size model reaches **~99% of the strongest model's quality at ~28% of the cost**.
+- The cheapest model still reaches **~91%** of the top quality.
+- Out of 10 models, only **4 sit on the cost-quality Pareto frontier** — the rest are strictly dominated, including the largest one.
+
+So instead of routing everything to the most capable model, Adaptive Agent
+picks a model that is *good enough for the task* and escalates only when an
+output actually fails a quality check. In our measurements, task-aware routing
+cut serving cost by **~80%** with **<2% quality loss** versus always using the
+strongest model.
+
+> These numbers are directional, from a pilot study on one provider. Your
+> mileage will vary by workload and provider — which is exactly why the routing
+> decision should be data-driven and observable, not a fixed rule.
+
+---
+
 ## What it does in 30 seconds
 
 ```

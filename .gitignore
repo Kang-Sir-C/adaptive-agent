@@ -19,4 +19,5 @@ src/experiments/simulate-routing.ts
 src/experiments/analyze-extended.ts
 src/experiments/compare-baselines.ts
 src/experiments/verify-optimal-stopping.ts
+src/experiments/human-eval.ts
 
